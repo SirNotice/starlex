@@ -1,4 +1,3 @@
-// File: StarlexHub/src/main/kotlin/net/starlexpvp/starlexHub/managers/MOTDManager.kt
 package net.starlexpvp.starlexHub.managers
 
 import org.bukkit.ChatColor
