@@ -1,17 +1,14 @@
 package net.starlexpvp.starlexHub
 
-import org.bukkit.ChatColor
-import org.bukkit.configuration.file.YamlConfiguration
+import net.starlexpvp.starlexHub.managers.MOTDManager
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.plugin.java.JavaPlugin
-import java.io.File
 
 class StarlexHub : JavaPlugin() {
 
-    private lateinit var messagesConfig: YamlConfiguration
-    private lateinit var messagesFile: File
+    private lateinit var motdManager: MOTDManager
 
     override fun onEnable() {
         // Ensure the plugin data folder exists
@@ -19,38 +16,24 @@ class StarlexHub : JavaPlugin() {
             dataFolder.mkdirs()
         }
 
-        // Load or create the messages.yml file
-        messagesFile = File(dataFolder, "messages.yml")
-        if (!messagesFile.exists()) {
-            saveResource("messages.yml", false) // Save the default messages.yml from resources
-        }
-        messagesConfig = YamlConfiguration.loadConfiguration(messagesFile)
+        // Initialize the MOTD Manager
+        motdManager = MOTDManager(this)
+        motdManager.loadConfig()
 
         // Register the PlayerJoinListener
-        server.pluginManager.registerEvents(PlayerJoinListener(this), this)
+        server.pluginManager.registerEvents(PlayerJoinListener(motdManager), this)
     }
 
     override fun onDisable() {
         // Plugin shutdown logic
     }
-
-    fun getMessagesConfig(): YamlConfiguration {
-        return messagesConfig
-    }
 }
 
-class PlayerJoinListener(private val plugin: StarlexHub) : Listener {
+class PlayerJoinListener(private val motdManager: MOTDManager) : Listener {
 
     @EventHandler
     fun onPlayerJoin(event: PlayerJoinEvent) {
         val player = event.player
-
-        // Load the MOTD from messages.yml
-        val motdLines = plugin.getMessagesConfig().getStringList("motd")
-
-        // Send each MOTD line to the player
-        for (line in motdLines) {
-            player.sendMessage(ChatColor.translateAlternateColorCodes('&', line))
-        }
+        motdManager.sendMOTD(player)
     }
 }

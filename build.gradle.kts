@@ -1,5 +1,6 @@
 plugins {
     kotlin("jvm") version "2.1.20-RC3"
+    kotlin("kapt") version "2.1.20-RC3"
 }
 
 group = "net.starlexpvp"
