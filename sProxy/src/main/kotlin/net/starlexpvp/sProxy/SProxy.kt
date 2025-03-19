@@ -8,6 +8,7 @@ import com.velocitypowered.api.plugin.Plugin
 import com.velocitypowered.api.proxy.ProxyServer
 import net.starlexpvp.sProxy.commands.JoinCommand
 import net.starlexpvp.sProxy.commands.QueueCommand
+import net.starlexpvp.sProxy.messaging.ProxyMessagingHandler
 import net.starlexpvp.sProxy.placeholders.QueuePlaceholders
 import net.starlexpvp.sProxy.queue.QueueManager
 import org.slf4j.Logger
@@ -21,6 +22,7 @@ class SProxy @Inject constructor(val server: ProxyServer, val logger: Logger) {
 
     lateinit var queueManager: QueueManager
     lateinit var queuePlaceholders: QueuePlaceholders
+    lateinit var messagingHandler: ProxyMessagingHandler
 
     @Subscribe
     fun onProxyInitialization(event: ProxyInitializeEvent) {
@@ -29,6 +31,12 @@ class SProxy @Inject constructor(val server: ProxyServer, val logger: Logger) {
 
         // Initialize placeholders
         queuePlaceholders = QueuePlaceholders(queueManager)
+
+        // Initialize messaging handler
+        messagingHandler = ProxyMessagingHandler(this, server, queueManager, queuePlaceholders)
+
+        // Register the messaging handler for events
+        server.eventManager.register(this, messagingHandler)
 
         // Register commands
         server.commandManager.register("join", JoinCommand(this, queueManager))

@@ -1,14 +1,17 @@
 package net.starlexpvp.starlexHub
 
 import net.starlexpvp.starlexHub.managers.MOTDManager
+import net.starlexpvp.starlexHub.managers.ScoreboardManager
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
+import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.plugin.java.JavaPlugin
 
 class StarlexHub : JavaPlugin() {
 
     private lateinit var motdManager: MOTDManager
+    private lateinit var scoreboardManager: ScoreboardManager
 
     override fun onEnable() {
         // Ensure the plugin data folder exists
@@ -20,8 +23,13 @@ class StarlexHub : JavaPlugin() {
         motdManager = MOTDManager(this)
         motdManager.loadConfig()
 
-        // Register the PlayerJoinListener
-        server.pluginManager.registerEvents(PlayerJoinListener(motdManager), this)
+        // Initialize the Scoreboard Manager
+        scoreboardManager = ScoreboardManager(this)
+        scoreboardManager.loadConfig()
+        scoreboardManager.startScoreboardTask()
+
+        // Register event listeners
+        server.pluginManager.registerEvents(HubListener(motdManager, scoreboardManager), this)
     }
 
     override fun onDisable() {
@@ -29,11 +37,21 @@ class StarlexHub : JavaPlugin() {
     }
 }
 
-class PlayerJoinListener(private val motdManager: MOTDManager) : Listener {
+class HubListener(
+    private val motdManager: MOTDManager,
+    private val scoreboardManager: ScoreboardManager
+) : Listener {
 
     @EventHandler
     fun onPlayerJoin(event: PlayerJoinEvent) {
         val player = event.player
         motdManager.sendMOTD(player)
+        scoreboardManager.setScoreboard(player)
+    }
+
+    @EventHandler
+    fun onPlayerQuit(event: PlayerQuitEvent) {
+        val player = event.player
+        scoreboardManager.removeScoreboard(player)
     }
 }
