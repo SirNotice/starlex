@@ -34,18 +34,13 @@ class ProxyMessaging(private val plugin: StarlexHub) : PluginMessageListener {
 
                 plugin.logger.info("Queue data for $uuid: inQueue=$inQueue, server=$server, position=$position, total=$total")
 
-                queueData[uuid] = QueueData(inQueue, server, position, total)
+                val newQueueData = QueueData(inQueue, server, position, total)
+                queueData[uuid] = newQueueData
 
-                // Immediately update this player's scoreboard
                 val targetPlayer = Bukkit.getPlayer(uuid)
                 if (targetPlayer != null && targetPlayer.isOnline) {
-                    // Get scoreboard manager and update scoreboard
-                    val manager = plugin as? StarlexHub
-                    manager?.let {
-                        Bukkit.getScheduler().runTask(plugin, Runnable {
-                            it.scoreboardManager.updateScoreboard(targetPlayer)
-                        })
-                    }
+                    plugin.logger.info("Directly updating scoreboard for ${targetPlayer.name} with inQueue=$inQueue")
+                    plugin.scoreboardManager.updateScoreboardWithQueueData(targetPlayer, newQueueData)
                 }
             }
         } catch (e: Exception) {
@@ -54,9 +49,6 @@ class ProxyMessaging(private val plugin: StarlexHub) : PluginMessageListener {
         }
     }
 
-    /**
-     * Request queue data for a player
-     */
     fun requestQueueData(player: Player) {
         val output = ByteArrayOutputStream()
         val out = DataOutputStream(output)
@@ -72,11 +64,10 @@ class ProxyMessaging(private val plugin: StarlexHub) : PluginMessageListener {
         }
     }
 
-    /**
-     * Get queue data for a player
-     */
     fun getQueueData(player: Player): QueueData {
-        return queueData.getOrDefault(player.uniqueId, QueueData(false, "None", -1, 0))
+        val data = queueData.getOrDefault(player.uniqueId, QueueData(false, "None", -1, 0))
+        plugin.logger.info("Fetched queue data for ${player.name}: inQueue=${data.inQueue}")
+        return data
     }
 
     data class QueueData(

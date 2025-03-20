@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit
 
 
 class QueueManager(private val plugin: SProxy, private val server: ProxyServer) {
-
+    private val serverSlots = mutableMapOf<String, Int>()
     // Map of server name to queue of players
     private val queues = ConcurrentHashMap<String, ConcurrentLinkedQueue<UUID>>()
 
