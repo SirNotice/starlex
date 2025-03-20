@@ -1,6 +1,7 @@
 package net.starlexpvp.starlexHub.managers
 
 import net.luckperms.api.LuckPerms
+import net.luckperms.api.event.user.UserDataRecalculateEvent
 import net.starlexpvp.starlexHub.StarlexHub
 import net.starlexpvp.starlexHub.messaging.ProxyMessaging
 import org.bukkit.Bukkit
@@ -12,11 +13,13 @@ import org.bukkit.scoreboard.Objective
 import org.bukkit.scoreboard.Scoreboard
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class ScoreboardManager(private val plugin: StarlexHub) {
 
     private lateinit var scoreboardConfig: YamlConfiguration
     private lateinit var scoreboardFile: File
+    private val playerRankCache = ConcurrentHashMap<UUID, String>()
     private val proxyMessaging = ProxyMessaging(plugin)
 
     /**
@@ -28,6 +31,13 @@ class ScoreboardManager(private val plugin: StarlexHub) {
             plugin.saveResource("scoreboard.yml", false)
         }
         scoreboardConfig = YamlConfiguration.loadConfiguration(scoreboardFile)
+        // In ScoreboardManager.kt - add to loadConfig() method
+        val luckPermsProvider = Bukkit.getServicesManager().getRegistration(LuckPerms::class.java)?.provider
+        luckPermsProvider?.eventBus?.subscribe(plugin, UserDataRecalculateEvent::class.java) { event ->
+            val player = Bukkit.getPlayer(event.user.uniqueId) ?: return@subscribe
+            updateRankCache(player)
+            updateScoreboard(player)
+        }
     }
 
     /**
@@ -42,6 +52,18 @@ class ScoreboardManager(private val plugin: StarlexHub) {
         Bukkit.getScheduler().runTaskLater(plugin, Runnable {
             updateScoreboard(player)
         }, 10L)
+    }
+
+    // Add a method to update the rank cache
+    private fun updateRankCache(player: Player) {
+        val luckPermsProvider = Bukkit.getServicesManager().getRegistration(LuckPerms::class.java)?.provider
+        val user = luckPermsProvider?.userManager?.getUser(player.uniqueId)
+        val rankName = user?.primaryGroup ?: "None"
+        playerRankCache[player.uniqueId] = rankName
+    }
+
+    fun loadPlayerData(player: Player) {
+        updateRankCache(player)
     }
 
     /**
@@ -89,10 +111,8 @@ class ScoreboardManager(private val plugin: StarlexHub) {
         processed = processed.replace("%online%", Bukkit.getOnlinePlayers().size.toString())
         processed = processed.replace("%max_players%", Bukkit.getMaxPlayers().toString())
 
-        // LuckPerms placeholders for rank
-        val luckPermsProvider = Bukkit.getServicesManager().getRegistration(LuckPerms::class.java)?.provider
-        val user = luckPermsProvider?.userManager?.getUser(player.uniqueId)
-        val rankName = user?.primaryGroup ?: "None"
+        // Use cached rank data
+        val rankName = playerRankCache.getOrDefault(player.uniqueId, "None")
         processed = processed.replace("%rank%", rankName)
 
         // Queue placeholders

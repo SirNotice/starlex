@@ -1,6 +1,7 @@
 package net.starlexpvp.starlexHub.messaging
 
 import net.starlexpvp.starlexHub.StarlexHub
+import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import org.bukkit.plugin.messaging.PluginMessageListener
 import java.io.ByteArrayInputStream
@@ -34,6 +35,18 @@ class ProxyMessaging(private val plugin: StarlexHub) : PluginMessageListener {
                 plugin.logger.info("Queue data for $uuid: inQueue=$inQueue, server=$server, position=$position, total=$total")
 
                 queueData[uuid] = QueueData(inQueue, server, position, total)
+
+                // Immediately update this player's scoreboard
+                val targetPlayer = Bukkit.getPlayer(uuid)
+                if (targetPlayer != null && targetPlayer.isOnline) {
+                    // Get scoreboard manager and update scoreboard
+                    val manager = plugin as? StarlexHub
+                    manager?.let {
+                        Bukkit.getScheduler().runTask(plugin, Runnable {
+                            it.scoreboardManager.updateScoreboard(targetPlayer)
+                        })
+                    }
+                }
             }
         } catch (e: Exception) {
             plugin.logger.severe("Error processing plugin message: ${e.message}")

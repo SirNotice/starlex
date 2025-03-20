@@ -12,7 +12,7 @@ import org.bukkit.plugin.java.JavaPlugin
 class StarlexHub : JavaPlugin() {
 
     private lateinit var motdManager: MOTDManager
-    private lateinit var scoreboardManager: ScoreboardManager
+    lateinit var scoreboardManager: ScoreboardManager
 
     override fun onEnable() {
         // Ensure the plugin data folder exists
@@ -51,6 +51,7 @@ class HubListener(
     fun onPlayerJoin(event: PlayerJoinEvent) {
         val player = event.player
         motdManager.sendMOTD(player)
+        scoreboardManager.loadPlayerData(player)
         scoreboardManager.setScoreboard(player)
     }
 
