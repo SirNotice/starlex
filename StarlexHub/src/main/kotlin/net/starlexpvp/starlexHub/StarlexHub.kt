@@ -2,6 +2,7 @@ package net.starlexpvp.starlexHub
 
 import net.starlexpvp.starlexHub.managers.MOTDManager
 import net.starlexpvp.starlexHub.managers.ScoreboardManager
+import net.starlexpvp.starlexHub.messaging.ProxyMessaging
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
@@ -18,6 +19,10 @@ class StarlexHub : JavaPlugin() {
         if (!dataFolder.exists()) {
             dataFolder.mkdirs()
         }
+
+        // Register plugin messaging channels
+        server.messenger.registerOutgoingPluginChannel(this, "starlex:queue")
+        server.messenger.registerIncomingPluginChannel(this, "starlex:queue", ProxyMessaging(this))
 
         // Initialize the MOTD Manager
         motdManager = MOTDManager(this)

@@ -3,13 +3,29 @@ enabled: true
 title: "&d&lStarlex Network"
 update-interval: 20 # Ticks (20 = 1 second)
 
-lines:
+# Lines displayed when a player is NOT in a queue
+normal-lines:
   - "&7&m-----------------------"
   - "&fWelcome, &d%player%"
   - "&7"
+  - "&fRank: &d%rank%"
+  - "&7"
   - "&fOnline: &d%online%&f/&d%max_players%"
   - "&7"
-  - "&fQueue: &d%queue_server%"
+  - "&fstore.starlexpvp.net"
+  - "&7&m-----------------------"
+
+# Lines displayed when a player IS in a queue
+queue-lines:
+  - "&7&m-----------------------"
+  - "&fWelcome, &d%player%"
+  - "&7"
+  - "&fRank: &d%rank%"
+  - "&7"
+  - "&fOnline: &d%online%&f/&d%max_players%"
+  - "&7"
+  - "&d&lQueue Info"
+  - "&fServer: &d%queue_server%"
   - "&fPosition: &d%queue_position%&f/&d%queue_total%"
   - "&7"
   - "&fstore.starlexpvp.net"

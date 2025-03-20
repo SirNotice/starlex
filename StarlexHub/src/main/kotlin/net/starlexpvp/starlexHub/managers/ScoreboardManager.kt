@@ -1,5 +1,6 @@
 package net.starlexpvp.starlexHub.managers
 
+import net.luckperms.api.LuckPerms
 import net.starlexpvp.starlexHub.StarlexHub
 import net.starlexpvp.starlexHub.messaging.ProxyMessaging
 import org.bukkit.Bukkit
@@ -10,21 +11,18 @@ import org.bukkit.scoreboard.DisplaySlot
 import org.bukkit.scoreboard.Objective
 import org.bukkit.scoreboard.Scoreboard
 import java.io.File
-import java.util.HashMap
 import java.util.UUID
 
 class ScoreboardManager(private val plugin: StarlexHub) {
 
     private lateinit var scoreboardConfig: YamlConfiguration
     private lateinit var scoreboardFile: File
-    private val playerScoreboards = HashMap<UUID, Scoreboard>()
     private val proxyMessaging = ProxyMessaging(plugin)
 
     /**
      * Loads the scoreboard configuration from file
      */
     fun loadConfig() {
-        // Load or create the scoreboard.yml file
         scoreboardFile = File(plugin.dataFolder, "scoreboard.yml")
         if (!scoreboardFile.exists()) {
             plugin.saveResource("scoreboard.yml", false)
@@ -33,91 +31,55 @@ class ScoreboardManager(private val plugin: StarlexHub) {
     }
 
     /**
-     * Creates and sets a scoreboard for a player
+     * Sets up a scoreboard for a player with a slight delay for queue data
      */
     fun setScoreboard(player: Player) {
-        if (!scoreboardConfig.getBoolean("enabled", true)) {
-            return
-        }
+        if (!scoreboardConfig.getBoolean("enabled", true)) return
 
-        // Request queue data before setting the scoreboard
         proxyMessaging.requestQueueData(player)
 
-        val manager = Bukkit.getScoreboardManager()
-        val scoreboard = manager?.newScoreboard ?: return
-
-        val objective = scoreboard.registerNewObjective(
-            "hubboard",
-            "dummy",
-            ChatColor.translateAlternateColorCodes('&', scoreboardConfig.getString("title") ?: "&d&lStarlex Network")
-        )
-
-
-        objective.displaySlot = DisplaySlot.SIDEBAR
-
-        // Set the scoreboard lines
-        val lines = scoreboardConfig.getStringList("lines")
-        var score = lines.size
-
-        for (line in lines) {
-            val processedLine = processPlaceholders(player, line)
-            objective.getScore(processedLine).score = score
-            score--
-        }
-
-        player.scoreboard = scoreboard
-        playerScoreboards[player.uniqueId] = scoreboard
+        // Schedule scoreboard update after queue data is received
+        Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+            updateScoreboard(player)
+        }, 10L)
     }
 
     /**
-     * Updates the scoreboard for a player
+     * Updates the player's scoreboard dynamically
      */
     fun updateScoreboard(player: Player) {
-        if (!scoreboardConfig.getBoolean("enabled", true)) {
-            return
-        }
+        if (!scoreboardConfig.getBoolean("enabled", true)) return
 
-        // Request fresh queue data
-        proxyMessaging.requestQueueData(player)
+        val queueData = proxyMessaging.getQueueData(player)
+        val manager = Bukkit.getScoreboardManager() ?: return
+        val scoreboard = player.scoreboard ?: manager.newScoreboard
 
-        // If player doesn't have a scoreboard yet, set one
-        if (!playerScoreboards.containsKey(player.uniqueId)) {
-            setScoreboard(player)
-            return
-        }
-
-        // Get the player's existing scoreboard
-        val scoreboard = playerScoreboards[player.uniqueId] ?: return
-
-        // Clear existing objective
-        val oldObjective = scoreboard.getObjective("hubboard")
-        oldObjective?.unregister()
+        // Clear old scoreboard objective
+        scoreboard.getObjective("hubboard")?.unregister()
 
         // Create new objective
         val objective = scoreboard.registerNewObjective(
-            "hubboard",
-            "dummy",
+            "hubboard", "dummy",
             ChatColor.translateAlternateColorCodes('&', scoreboardConfig.getString("title") ?: "&d&lStarlex Network")
         )
-
-
         objective.displaySlot = DisplaySlot.SIDEBAR
 
-        // Update the scoreboard lines
-        val lines = scoreboardConfig.getStringList("lines")
-        var score = lines.size
+        // Choose lines based on queue status
+        val lines = if (queueData.inQueue) scoreboardConfig.getStringList("queue-lines")
+        else scoreboardConfig.getStringList("normal-lines")
 
+        // Update scoreboard lines
+        var score = lines.size
         for (line in lines) {
             val processedLine = processPlaceholders(player, line)
-            objective.getScore(processedLine).score = score
-            score--
+            objective.getScore(processedLine).score = score--
         }
 
         player.scoreboard = scoreboard
     }
 
     /**
-     * Process placeholders in a string
+     * Processes placeholders for dynamic scoreboard content
      */
     private fun processPlaceholders(player: Player, text: String): String {
         var processed = ChatColor.translateAlternateColorCodes('&', text)
@@ -126,6 +88,12 @@ class ScoreboardManager(private val plugin: StarlexHub) {
         processed = processed.replace("%player%", player.name)
         processed = processed.replace("%online%", Bukkit.getOnlinePlayers().size.toString())
         processed = processed.replace("%max_players%", Bukkit.getMaxPlayers().toString())
+
+        // LuckPerms placeholders for rank
+        val luckPermsProvider = Bukkit.getServicesManager().getRegistration(LuckPerms::class.java)?.provider
+        val user = luckPermsProvider?.userManager?.getUser(player.uniqueId)
+        val rankName = user?.primaryGroup ?: "None"
+        processed = processed.replace("%rank%", rankName)
 
         // Queue placeholders
         val queueData = proxyMessaging.getQueueData(player)
@@ -138,20 +106,24 @@ class ScoreboardManager(private val plugin: StarlexHub) {
     }
 
     /**
-     * Removes a player's scoreboard
+     * Removes a player's scoreboard when they leave
      */
     fun removeScoreboard(player: Player) {
-        playerScoreboards.remove(player.uniqueId)
+        player.scoreboard = Bukkit.getScoreboardManager()?.newScoreboard!!
     }
 
     /**
-     * Start the scoreboard update task
+     * Starts a repeating scoreboard update task for all players
      */
     fun startScoreboardTask() {
         val updateInterval = scoreboardConfig.getLong("update-interval", 20L)
-        plugin.server.scheduler.scheduleSyncRepeatingTask(plugin, {
+
+        Bukkit.getScheduler().runTaskTimer(plugin, Runnable {
             for (player in Bukkit.getOnlinePlayers()) {
-                updateScoreboard(player)
+                proxyMessaging.requestQueueData(player)
+                Bukkit.getScheduler().runTaskLater(plugin, Runnable {
+                    updateScoreboard(player)
+                }, 5L)
             }
         }, updateInterval, updateInterval)
     }

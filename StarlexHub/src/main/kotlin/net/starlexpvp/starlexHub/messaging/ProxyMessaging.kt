@@ -2,6 +2,7 @@ package net.starlexpvp.starlexHub.messaging
 
 import net.starlexpvp.starlexHub.StarlexHub
 import org.bukkit.entity.Player
+import org.bukkit.plugin.messaging.PluginMessageListener
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
@@ -9,29 +10,35 @@ import java.io.DataOutputStream
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-class ProxyMessaging(private val plugin: StarlexHub) {
+class ProxyMessaging(private val plugin: StarlexHub) : PluginMessageListener {
 
     private val CHANNEL = "starlex:queue"
     private val queueData = ConcurrentHashMap<UUID, QueueData>()
 
-    init {
-        plugin.server.messenger.registerOutgoingPluginChannel(plugin, CHANNEL)
-        plugin.server.messenger.registerIncomingPluginChannel(plugin, CHANNEL, { channel, player, message ->
-            if (channel != CHANNEL) return@registerIncomingPluginChannel
+    override fun onPluginMessageReceived(channel: String, player: Player, message: ByteArray) {
+        if (channel != CHANNEL) return
 
+        try {
             val input = DataInputStream(ByteArrayInputStream(message))
-            when (input.readUTF()) {
-                "QueueData" -> {
-                    val uuid = UUID.fromString(input.readUTF())
-                    val inQueue = input.readBoolean()
-                    val server = if (inQueue) input.readUTF() else "None"
-                    val position = if (inQueue) input.readInt() else -1
-                    val total = if (inQueue) input.readInt() else 0
+            val subChannel = input.readUTF()
 
-                    queueData[uuid] = QueueData(inQueue, server, position, total)
-                }
+            plugin.logger.info("Received message on channel $channel, subChannel: $subChannel")
+
+            if (subChannel == "QueueData") {
+                val uuid = UUID.fromString(input.readUTF())
+                val inQueue = input.readBoolean()
+                val server = if (inQueue) input.readUTF() else "None"
+                val position = if (inQueue) input.readInt() else -1
+                val total = if (inQueue) input.readInt() else 0
+
+                plugin.logger.info("Queue data for $uuid: inQueue=$inQueue, server=$server, position=$position, total=$total")
+
+                queueData[uuid] = QueueData(inQueue, server, position, total)
             }
-        })
+        } catch (e: Exception) {
+            plugin.logger.severe("Error processing plugin message: ${e.message}")
+            e.printStackTrace()
+        }
     }
 
     /**
@@ -46,6 +53,7 @@ class ProxyMessaging(private val plugin: StarlexHub) {
             out.writeUTF(player.uniqueId.toString())
 
             player.sendPluginMessage(plugin, CHANNEL, output.toByteArray())
+            plugin.logger.info("Sent queue data request for player: ${player.name}")
         } catch (e: Exception) {
             plugin.logger.warning("Failed to send queue data request: ${e.message}")
         }
